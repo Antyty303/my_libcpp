@@ -1,0 +1,85 @@
+name: Lazy C++ CI (Conditional Testing)
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    
+    outputs:
+      vector: ${{ steps.filter.outputs.vector }}
+      deque: ${{ steps.filter.outputs.deque }}
+      stack: ${{ steps.filter.outputs.stack }}
+      queue: ${{ steps.filter.outputs.queue }}
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 2 #загрузить из истории 2 последних коммита
+
+    - name: Check which components changed
+      id: filter
+      uses: dorny/paths-filter@v3
+      with:
+        filters: |
+          vector:
+            - 'include/my/vector.h'
+            - 'tests/test_vector.cpp'
+          
+          deque:
+            - 'include/my/deque.h'
+            - 'tests/test_deque.cpp'
+          
+          stack:
+            - 'include/my/stack.h'
+            - 'tests/test_stack.cpp'
+            - 'include/my/deque.h'
+            - 'include/my/vector.h'
+          
+          queue:
+            - 'include/my/queue.h'
+            - 'tests/test_queue.cpp'
+            - 'include/my/deque.h'
+
+  build-and-test:
+    needs: changes
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install GCC
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y g++-11 cmake
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cmake -B build -S . -DCMAKE_CXX_COMPILER=g++-11 -DBUILD_TESTING=ON
+
+    - name: Build Project
+      run: cmake --build build --config Release
+
+    - name: Run Vector Tests
+      if: ${{ needs.changes.outputs.vector == 'true' }}
+      run: cd build && ctest -R "my_lib_tests\.VectorTests" --output-on-failure
+
+    - name: Run Deque Tests
+      if: ${{ needs.changes.outputs.deque == 'true' }}
+      run: cd build && ctest -R "my_lib_tests\.DequeTests" --output-on-failure
+
+    - name: Run Stack Tests
+      if: ${{ needs.changes.outputs.stack == 'true' }}
+      run: cd build && ctest -R "my_lib_tests\.StackTests" --output-on-failure
+
+    - name: Run Queue Tests
+      if: ${{ needs.changes.outputs.queue == 'true' }}
+      run: cd build && ctest -R "my_lib_tests\.QueueTests" --output-on-failure
