@@ -171,8 +171,8 @@ namespace my {
 		iterator end() noexcept { return data_ + size_; }
 		const_iterator begin() const noexcept { return data_; }
 		const_iterator end() const noexcept { return data_ + size_; }
-		const_iterator ñbegin() const noexcept { return data_; }
-		const_iterator ñend() const noexcept { return data_ + size_; }
+		const_iterator cbegin() const noexcept { return data_; }
+		const_iterator cend() const noexcept { return data_ + size_; }
 #else
 		iterator begin() noexcept { return { data_, this }; }
 		iterator end() noexcept { return { data_ + size_, this }; }
