@@ -10,7 +10,7 @@ target_include_directories(my_lib INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 include(CTest)
 if(BUILD_TESTING)
     set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    add_subdirectory(3rdparty/googletest)
+    add_subdirectory(3rdparty/gtest)
     
     add_subdirectory(tests)
 endif()
