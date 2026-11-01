@@ -62,9 +62,7 @@ namespace my {
 
 		public:
 			Iterator() = default;
-			Iterator(PtrT ptr, map_pointer map_ptr)
-				: cur_(ptr), map_ptr_(map_ptr), block_start_(*map_ptr), block_end_(*map_ptr + block_size_) {
-			}
+			Iterator(PtrT ptr, map_pointer map_ptr);
 			Iterator(const Iterator& other) = default;
 
 			RefT operator*() const { return *cur_; }
@@ -115,10 +113,63 @@ namespace my {
 		deque(deque&& other) noexcept(std::is_nothrow_move_constructible_v<Alloc>);
 		deque(deque&& other, const Alloc& alloc) noexcept(Traits::is_always_equal::value);
 		~deque() noexcept;
+
+		reference operator[](size_type index) { return *(begin_ + pos); }
+		const_reference operator[](size_type index) const { return *(begin_ + pos); }
+		reference at(size_type index) {
+			if (index >= size_) throw std::out_of_range("deque::at() index out of range");
+			return *(begin_ + pos);
+		}
+		const_reference at(size_type index) const {
+			if (index >= size_) throw std::out_of_range("deque::at() index out of range");
+			return *(begin_ + pos);
+		}
+
+		reference front() {
+			if (size_ == 0) throw std::out_of_range("vector::front() on empty deque");
+			return *begin_;
+		}
+		const_reference front() const {
+			if (size_ == 0) throw std::out_of_range("vector::front() on empty deque");
+			return *begin_;
+		}
+		reference back() {
+			if (size_ == 0) throw std::out_of_range("vector::back() on empty deque");
+			return *(end_ - 1);
+		}
+		const_reference back() const {
+			if (size_ == 0) throw std::out_of_range("vector::back() on empty deque");
+			return *(end_ - 1);
+		}
+
+		iterator begin() noexcept { return begin_; }
+		iterator end() noexcept { return end_; }
+		const_iterator begin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; }
+		const_iterator end() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
+		const_iterator cbegin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; }
+		const_iterator cend() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
+
+		size_type size() const noexcept { return size_; }
+		bool empty() const noexcept { return size_ == 0; }
+		Alloc get_allocator() const noexcept { return alloc_; }
+		size_type max_size() const noexcept { return Traits::max_size(alloc_); }
+
+
 	};
 #pragma endregion
 
 #pragma region iterator functions
+	template<typename T, typename Alloc>
+	template<typename PtrT, typename RefT>
+	inline deque<T, Alloc>::Iterator<PtrT, RefT>::Iterator(PtrT ptr, map_pointer map_ptr) {
+		if (map_ptr != nullptr) {
+			cur_ = ptr;
+			map_ptr_ = map_ptr;
+			block_start_ = *map_ptr;
+			block_end_ = *map_ptr + block_size_;
+		}
+	}
+
 	template<typename T, typename Alloc>
 	template<typename PtrT, typename RefT>
 	inline typename deque<T, Alloc>::Iterator<PtrT, RefT>& deque<T, Alloc>::Iterator<PtrT, RefT>::operator++() {
