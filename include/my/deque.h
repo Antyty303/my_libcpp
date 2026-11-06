@@ -208,8 +208,8 @@ namespace my {
 		iterator erase(const_iterator pos);
 		iterator erase(const_iterator first, const_iterator last);
 		//
-		bool operator!=(const deque& other) const;
 		bool operator==(const deque& other) const;
+		bool operator!=(const deque& other) const;
 		bool operator<=(const deque& other) const;
 		bool operator>=(const deque& other) const;
 		bool operator<(const deque& other) const;
@@ -1052,6 +1052,70 @@ namespace my {
 		tmp.map_size_ = 0;
 		tmp.size_ = 0;
 		tmp.begin_ = tmp.end_ = iterator();
+	}
+#pragma endregion
+
+#pragma region comparison
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator==(const deque& other) const {
+		if (this == &other) return true;
+		if (size_ != other.size_) return false;
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_; ++a, ++b) {
+			if (!(*a == *b)) return false;
+		}
+		return true;
+	}
+
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator!=(const deque& other) const {
+		if (this == &other) return false;
+		if (size_ != other.size_) return true;
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_; ++a, ++b) {
+			if (!(*a == *b)) return true;
+		}
+		return false;
+	}
+	
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator<=(const deque& other) const {
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_ && b != other.end_; ++a, ++b) {
+			if (*a < *b) return true;
+			if (*b < *a) return false;
+		}
+		return a == end_;
+	}
+	
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator>=(const deque& other) const {
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_ && b != other.end_; ++a, ++b) {
+			if (*a < *b) return false;
+			if (*b < *a) return true;
+		}
+		return b == other.end_;
+	}
+	
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator<(const deque& other) const {
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_ && b != other.end_; ++a, ++b) {
+			if (*a < *b) return true;
+			if (*b < *a) return false;
+		}
+		return (a == end_) && (b != other.end_);
+	}
+	
+	template<typename T, typename Alloc>
+	inline bool deque<T, Alloc>::operator>(const deque& other) const {
+		iterator a = begin_, b = other.begin_;
+		for (; a != end_ && b != other.end_; ++a, ++b) {
+			if (*a < *b) return false;
+			if (*b < *a) return true;
+		}
+		return (a != end_) && (b == other.end_);
 	}
 #pragma endregion
 }
