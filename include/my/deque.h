@@ -153,8 +153,64 @@ namespace my {
 		bool empty() const noexcept { return size_ == 0; }
 		Alloc get_allocator() const noexcept { return alloc_; }
 		size_type max_size() const noexcept { return Traits::max_size(alloc_); }
+		//
+		void assign(size_type count, const T& val);
+		template<class It>
+		requires std::forward_iterator<It>
+		void assign(It first, It last);
+		template<class It>
+		requires std::input_iterator<It> && (!std::forward_iterator<It>)
+		void assign(It first, It last);
+		void assign(std::initializer_list<T> list);
 
+		deque& operator=(const deque& other);
+		deque& operator=(deque&& other) noexcept(
+			Traits::propagate_on_container_move_assignment::value || Traits::is_always_equal::value
+			);
+		deque& operator=(std::initializer_list<T> list);
 
+		void swap(deque& other) noexcept;
+		void shrink_to_fit();
+		void clear() noexcept;
+		void resize(size_type new_size);
+		void resize(size_type new_size, const T& val);
+		
+		void push_back(const T& val);
+		void push_back(T&& val);
+		template<typename... Args>
+		reference emplace_back(Args&&... args);
+		void pop_back();
+
+		void push_front(const T& val);
+		void push_front(T&& val);
+		template<typename... Args>
+		reference emplace_front(Args&&... args);
+		void pop_front();
+
+		iterator insert(const_iterator pos, const T& val);
+		iterator insert(const_iterator pos, T&& val);
+		iterator insert(const_iterator pos, size_type count, const T& val);
+		template<class It>
+		requires std::forward_iterator<It>
+		iterator insert(const_iterator pos, It first, It last);
+		template<class It>
+		requires std::input_iterator<It> && (!std::forward_iterator<It>)
+		iterator insert(const_iterator pos, It first, It last);
+		iterator insert(const_iterator pos, std::initializer_list<T> list);
+
+		template<typename... Args>
+		iterator emplace(const_iterator pos, Args&&... args);
+
+		iterator erase(const_iterator pos);
+		iterator erase(const_iterator first, const_iterator last);
+
+		bool operator!=(const deque& other) const;
+		bool operator==(const deque& other) const;
+		bool operator<=(const deque& other) const;
+		bool operator>=(const deque& other) const;
+		bool operator<(const deque& other) const;
+		bool operator>(const deque& other) const;
+		//
 	};
 #pragma endregion
 
@@ -265,6 +321,8 @@ namespace my {
 #pragma region private
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::create_map_and_blocks(size_type num_elements) {
+		if (num_elements > max_size()) throw std::length_error("deque length exceeds max_size");
+
 		size_type num_blocks = num_elements / block_size_ + 1;
 
 		map_size_ = ((8ull > num_block) ? static_cast<size_type>(8) : (num_blocks + 2));
@@ -307,7 +365,7 @@ namespace my {
 
 #pragma region constructors && destructor
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(size_type size, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(size_type size, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
 		create_map_and_blocks(size);
 		size_type i = 0;
 		try {
@@ -326,7 +384,7 @@ namespace my {
 	}
 
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(size_type size, const T& val, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(size_type size, const T& val, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
 		create_map_and_blocks(size);
 		size_type i = 0;
 		try {
@@ -347,7 +405,7 @@ namespace my {
 	template<typename T, typename Alloc>
 	template<class It>
 	requires  std::forward_iterator<It>
-	deque<T, Alloc>::deque(It first, It last, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_)  {
+	inline deque<T, Alloc>::deque(It first, It last, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_)  {
 		size_type size = std::distance(first, last);
 		create_map_and_blocks(size);
 		size_type i = 0;
@@ -369,7 +427,7 @@ namespace my {
 	template<typename T, typename Alloc>
 	template<class It>
 	requires std::input_iterator<It> && (!std::forward_iterator<It>)
-	deque<T, Alloc>::deque(It first, It last, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(It first, It last, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
 		size_type i = 0;
 		try {
 			for (; first != last; ++i, ++first) {
@@ -386,7 +444,7 @@ namespace my {
 	}
 
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(std::initializer_list<T> list, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(std::initializer_list<T> list, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
 		create_map_and_blocks(list.size());
 		size_type i = 0;
 		try {
@@ -404,7 +462,7 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(const deque& other) : alloc_(Traits::select_on_container_copy_construction(other.alloc_)), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(const deque& other) : alloc_(Traits::select_on_container_copy_construction(other.alloc_)), map_alloc_(alloc_) {
 		create_map_and_blocks(other.size_);
 		size_type i = 0;
 		try {
@@ -423,7 +481,7 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(const deque& other, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(const deque& other, const Alloc& alloc) : alloc_(alloc), map_alloc_(alloc_) {
 		create_map_and_blocks(other.size_);
 		size_type i = 0;
 		try {
@@ -442,7 +500,7 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(deque&& other) noexcept(std::is_nothrow_move_constructible_v<Alloc>) 
+	inline deque<T, Alloc>::deque(deque&& other) noexcept(std::is_nothrow_move_constructible_v<Alloc>) 
 		: map_(other.map_), map_size_(other.map_size_), begin_(other.begin_), end_(other.end_), size_(other.size_), alloc_(std::move(other.alloc_)), map_alloc_(std::move(other.map_alloc_)) {
 		other.begin_ = iterator{};
 		other.end_ = iterator{};
@@ -452,7 +510,7 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::deque(deque&& other, const Alloc& alloc) noexcept(Traits::is_always_equal::value) : alloc_(alloc), map_alloc_(alloc_) {
+	inline deque<T, Alloc>::deque(deque&& other, const Alloc& alloc) noexcept(Traits::is_always_equal::value) : alloc_(alloc), map_alloc_(alloc_) {
 		if constexpr (Traits::is_always_equal::value) {
 			begin_ = other.begin_;
 			end_ = other.end_;
@@ -467,16 +525,31 @@ namespace my {
 			other.map_size_ = 0;
 		}
 		else {
-			create_map_and_blocks(other.size_);
-			iterator it = begin_;
-			for (iterator src = other.begin_; src != other.end_; ++src, ++it) {
-				Traits::construct(alloc_, std::addressof(*it), std::move(*src));
+			if (alloc_ == other.alloc_) {
+				begin_ = other.begin_;
+				end_ = other.end_;
+				size_ = other.size_;
+				map_ = other.map_;
+				map_size_ = other.map_size_;
+
+				other.begin_ = iterator{};
+				other.end_ = iterator{};
+				other.size_ = 0;
+				other.map_ = nullptr;
+				other.map_size_ = 0;
+			}
+			else {
+				create_map_and_blocks(other.size_);
+				iterator it = begin_;
+				for (iterator src = other.begin_; src != other.end_; ++src, ++it) {
+					Traits::construct(alloc_, std::addressof(*it), std::move(*src));
+				}
 			}
 		}
 	}
 
 	template<typename T, typename Alloc>
-	deque<T, Alloc>::~deque() noexcept {
+	inline deque<T, Alloc>::~deque() noexcept {
 		if (map_ != nullptr) {
 			for (iterator it = begin_; it != end_; ++it) {
 				Traits::destroy(alloc_, std::addressof(*it));
@@ -491,4 +564,63 @@ namespace my {
 	}
 #pragma endregion
 
+#pragma region assign && operators
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::assign(size_type count, const T& val) {
+		if (count == 0) {
+			clear();
+			deallocate_memory();
+			return;
+		}
+
+		if constexpr (std::is_nothrow_copy_constructible_v<T>) {
+			size_t old_size = size_;
+			size_t assign_count = std::min(count, old_size);
+			size_t to_destruct = old_size - assign_count, to_construct = count - assign_count;
+
+			for (iterator it = begin_; assign_count > 0; --assign_count, ++it) {
+				*it = val;
+			}
+			for (; to_construct > 0; --to_construct) pop_back_internal(val);
+			for (; to_construct > 0; --to_construct) emplace_back_internal(val);
+			//после перезаписи надо вычислить новый begin и передвинуть. Блоки должны удаляться, оставляем только по 1 пустому слева и справа
+		}
+		else {
+			deque tmp(count, val, alloc_);
+			clear();
+			deallocate_memory();
+
+			begin_ = other.begin_;
+			end_ = other.end_;
+			size_ = other.size_;
+			map_ = other.map_;
+			map_size_ = other.map_size_;
+
+			other.begin_ = iterator{};
+			other.end_ = iterator{};
+			other.size_ = 0;
+			other.map_ = nullptr;
+			other.map_size_ = 0;
+		}
+	}
+
+	template<typename T, typename Alloc>
+	template<class It>
+	requires std::forward_iterator<It>
+	inline void deque<T, Alloc>::assign(It first, It last) {
+
+	}
+
+	template<typename T, typename Alloc>
+	template<class It>
+	requires std::input_iterator<It> && (!std::forward_iterator<It>)
+	inline void deque<T, Alloc>::assign(It first, It last) {
+
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::assign(std::initializer_list<T> list) {
+
+	}
+#pragma endregion //later
 }
