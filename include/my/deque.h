@@ -3,12 +3,13 @@
 #include <stdexcept>
 #include <type_traits>
 #include <memory>
+#include <algorithm> //swap
 #include <iterator> // std::random_access_iterator_tag
-
+//Всегда есть хотя бы 1 блок, иначе очищается всё вплоть до map_ 
 namespace my {
 #pragma region Class
 	template<typename T, typename Alloc = ::std::allocator<T>>
-	class deque {
+	class deque { 
 	private:
 		template <typename PtrT, typename RefT>
 		class Iterator; //forward declaration
@@ -95,6 +96,7 @@ namespace my {
 	private: // methods
 		void create_map_and_blocks(size_type num_elements);
 		void deallocate_memory() noexcept;
+		void shrink_to_size(size_type new_size) noexcept;
 
 	public: // methods
 		deque() noexcept(noexcept(Alloc()) && std::is_nothrow_copy_constructible_v<Alloc>) : alloc_(), map_alloc_(alloc_) {}
@@ -323,10 +325,21 @@ namespace my {
 	inline void deque<T, Alloc>::create_map_and_blocks(size_type num_elements) {
 		if (num_elements > max_size()) throw std::length_error("deque length exceeds max_size");
 
+		if (num_elements == 0) {
+			begin_ = end_ = iterator();
+			size_ = 0;
+			map_ = nullptr;
+			map_size_ = 0;
+			return;
+		}
+
 		size_type num_blocks = num_elements / block_size_ + 1;
 
-		map_size_ = ((8ull > num_block) ? static_cast<size_type>(8) : (num_blocks + 2));
+		map_size_ = ((8ull > num_blocks) ? static_cast<size_type>(8) : (num_blocks + 2));
 		map_ = map_Traits::allocate(map_alloc_, map_size_);
+		for (size_type i = 0; i < map_size_; ++i) {
+			map_[i] = nullptr;
+		}
 
 		map_pointer new_begin = map_ + (map_size_ - num_blocks) / 2;
 		map_pointer new_end = new_begin + num_blocks - 1;
@@ -341,7 +354,7 @@ namespace my {
 			for (map_pointer ptr = new_begin; ptr < cur; ++ptr) {
 				Traits::deallocate(alloc_, *ptr, block_size_);
 			}
-			map_Traits::deallocate(map_allocator, map_, map_size_);
+			map_Traits::deallocate(map_alloc_, map_, map_size_);
 			throw;
 		}
 		size_ = num_elements;
@@ -351,15 +364,38 @@ namespace my {
 
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::deallocate_memory() noexcept {
-		if (map_ != nullptr) {
-			for (map_pointer cur = begin_.map_ptr_; cur <= end_.map_ptr_; ++cur) {
-				if (*cur != nullptr) Traits::deallocate(alloc_, *cur, block_size_);
+		if (map_ != nullptr) { //This ensures that begin_.map_ptr_ != nullptr
+			for (map_pointer cur = map_; cur < map_ + map_size_; ++cur) {
+				if (*cur != nullptr) {
+					Traits::deallocate(alloc_, *cur, block_size_);
+					*cur = nullptr;
+				}
 			}
 			map_Traits::deallocate(map_alloc_, map_, map_size_);
 			map_ = nullptr;
 			map_size_ = 0;
 			size_ = 0;
 		}
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::shrink_to_size(size_type new_size) noexcept {
+		for (iterator it = begin_ + new_size; it != end_; ++it) Traits::destroy(alloc_, std::addressof(*it));
+		end_ = begin_ + new_size;
+
+		if (end_.cur_ == end_.block_start_ && end_.map_ptr_ != begin_.map_ptr_) {
+			Traits::deallocate(alloc_, *end_.map_ptr_, block_size_);
+			*end_.map_ptr_ = nullptr;
+		}
+
+		for (map_pointer cur = end_.map_ptr_ + 1; cur < map_ + map_size_; ++cur) {
+			if (*cur != nullptr) {
+				Traits::deallocate(alloc_, *cur, block_size_);
+				*cur = nullptr;
+			}
+		}
+
+		size_ = new_size;
 	}
 #pragma endregion
 
@@ -567,41 +603,7 @@ namespace my {
 #pragma region assign && operators
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::assign(size_type count, const T& val) {
-		if (count == 0) {
-			clear();
-			deallocate_memory();
-			return;
-		}
-
-		if constexpr (std::is_nothrow_copy_constructible_v<T>) {
-			size_t old_size = size_;
-			size_t assign_count = std::min(count, old_size);
-			size_t to_destruct = old_size - assign_count, to_construct = count - assign_count;
-
-			for (iterator it = begin_; assign_count > 0; --assign_count, ++it) {
-				*it = val;
-			}
-			for (; to_construct > 0; --to_construct) pop_back_internal(val);
-			for (; to_construct > 0; --to_construct) emplace_back_internal(val);
-			//после перезаписи надо вычислить новый begin и передвинуть. Блоки должны удаляться, оставляем только по 1 пустому слева и справа
-		}
-		else {
-			deque tmp(count, val, alloc_);
-			clear();
-			deallocate_memory();
-
-			begin_ = other.begin_;
-			end_ = other.end_;
-			size_ = other.size_;
-			map_ = other.map_;
-			map_size_ = other.map_size_;
-
-			other.begin_ = iterator{};
-			other.end_ = iterator{};
-			other.size_ = 0;
-			other.map_ = nullptr;
-			other.map_size_ = 0;
-		}
+		
 	}
 
 	template<typename T, typename Alloc>
@@ -623,4 +625,161 @@ namespace my {
 
 	}
 #pragma endregion //later
+
+#pragma region swap && size
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::swap(deque& other) noexcept {
+		if (this == &other) return;
+
+		std::swap(map_, other.map_);
+		std::swap(map_size_, other.map_size_);
+		std::swap(begin_, other.begin_);
+		std::swap(end_, other.end_);
+		std::swap(size_, other.size_);
+
+		if constexpr (Traits::propagate_on_container_swap::value) {
+			std::swap(alloc_, other.alloc_);
+			std::swap(map_alloc_, other.map_alloc_);
+		}
+	}
+	
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::shrink_to_fit() {
+		if (size_ == 0) {
+			deallocate_memory();
+			return;
+		}
+
+		deque tmp(alloc_);
+		tmp.create_map_and_blocks(size_);
+		tmp.size_ = 0;
+		tmp.end_ = tmp.begin_;
+
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::construct(tmp.alloc_, std::addressof(*tmp.end_), std::move_if_noexcept(*it));
+			++tmp.end_;
+			++tmp.size_;
+		}
+
+		clear();
+		deallocate_memory();
+		map_ = tmp.map_;
+		map_size_ = tmp.map_size_;
+		begin_ = tmp.begin_;
+		end_ = tmp.end_;
+		size_ = tmp.size_;
+
+		tmp.map_ = nullptr;
+		tmp.map_size_ = 0;
+		tmp.size_ = 0;
+		tmp.begin_ = tmp.end_ = iterator();
+	}
+	
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::clear() noexcept {
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
+
+		if (map_ != nullptr) {
+			pointer block_to_keep = *begin_.map_ptr_;
+			*begin_.map_ptr_ = nullptr;
+
+			for (map_pointer cur = map_; cur < map_ + map_size_; ++cur) {
+				if (*cur != nullptr) {
+					Traits::deallocate(alloc_, *cur, block_size_);
+					*cur = nullptr;
+				}
+			}
+
+			map_pointer central_ptr = map_ + map_size_ / 2;
+			*central_ptr = block_to_keep;
+
+			begin_ = iterator(block_to_keep, central_ptr);
+			end_ = begin_;
+		}
+
+		size_ = 0;
+	}
+	
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::resize(size_type new_size) {
+		if (new_size > max_size()) throw std::length_error("deque length exceeds max_size");
+	
+		if (new_size < size_) {
+			if (new_size == 0) { clear(); return; }
+			shrink_to_size(new_size); return;
+		}
+		if (new_size == size_) return;
+
+		deque tmp(alloc_);
+		tmp.create_map_and_blocks(new_size);
+		tmp.size_ = 0;
+		tmp.end_ = tmp.begin_;
+
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::construct(tmp.alloc_, std::addressof(*tmp.end_), std::move_if_noexcept(*it));
+			++tmp.end_;
+			++tmp.size_;
+		}
+		for (size_type i = size_; i < new_size; ++i) {
+			Traits::construct(tmp.alloc_, std::addressof(*tmp.end_));
+			++tmp.end_;
+			++tmp.size_;
+		}
+
+		clear();
+		deallocate_memory();
+		map_ = tmp.map_;
+		map_size_ = tmp.map_size_;
+		begin_ = tmp.begin_;
+		end_ = tmp.end_;
+		size_ = tmp.size_;
+
+		tmp.map_ = nullptr;
+		tmp.map_size_ = 0;
+		tmp.size_ = 0;
+		tmp.begin_ = tmp.end_ = iterator();
+	}
+	
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::resize(size_type new_size, const T& val) {
+		if (new_size > max_size()) throw std::length_error("deque length exceeds max_size");
+
+		if (new_size < size_) {
+			if (new_size == 0) { clear(); return; }
+			shrink_to_size(new_size); return;
+		}
+		if (new_size == size_) return;
+
+		deque tmp(alloc_);
+		tmp.create_map_and_blocks(new_size);
+		tmp.size_ = 0;
+		tmp.end_ = tmp.begin_;
+
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::construct(tmp.alloc_, std::addressof(*tmp.end_), std::move_if_noexcept(*it));
+			++tmp.end_;
+			++tmp.size_;
+		}
+		for (size_type i = size_; i < new_size; ++i) {
+			Traits::construct(tmp.alloc_, std::addressof(*tmp.end_), val);
+			++tmp.end_;
+			++tmp.size_;
+		}
+
+		clear();
+		deallocate_memory();
+		map_ = tmp.map_;
+		map_size_ = tmp.map_size_;
+		begin_ = tmp.begin_;
+		end_ = tmp.end_;
+		size_ = tmp.size_;
+
+		tmp.map_ = nullptr;
+		tmp.map_size_ = 0;
+		tmp.size_ = 0;
+		tmp.begin_ = tmp.end_ = iterator();
+	}
+#pragma endregion
 }
