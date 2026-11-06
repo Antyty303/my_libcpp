@@ -13,7 +13,7 @@
 #define IF_CONFIGURATION_IS_DEBUG(code) 
 #endif
 
-//пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
+//Поскольку итераторы это отладочный инструмент под него память выделяться аллокатором не будет
 
 namespace my {
 #pragma region Class
@@ -431,21 +431,6 @@ namespace my {
 		other.size_ = 0;
 		other.capacity_ = 0;
 		other.data_ = nullptr;
-
-#ifndef NDEBUG
-		invalidate_all_iterators();
-		for (IteratorNode<T*, T&>* node = other.head_node_; node; node = node->next_) {
-			if (node->iterator_) node->iterator_->container_ = this;
-		}
-		for (IteratorNode<const T*, const T&>* node = other.head_node_const; node; node = node->next_) {
-			if (node->iterator_) node->iterator_->container_ = this;
-		}
-
-		head_node_ = other.head_node_;
-		head_node_const = other.head_node_const;
-		other.head_node_ = nullptr;
-		other.head_node_const = nullptr;
-#endif
 	}
 #pragma endregion
 
@@ -839,7 +824,7 @@ namespace my {
 
 	template<typename T, typename Alloc>
 	template<typename PtrT, typename RefT>
-	inline vector<T,Alloc>::DebugIterator<PtrT, RefT>::difference_type vector<T, Alloc>::DebugIterator<PtrT, RefT>::operator-(const DebugIterator<PtrT, RefT>& other) const {
+	inline vector<T,Alloc>::difference_type vector<T, Alloc>::DebugIterator<PtrT, RefT>::operator-(const DebugIterator<PtrT, RefT>& other) const {
 		validity_check_for_two(*this, other);
 		return ptr_ - other.ptr_;
 	}
@@ -1482,7 +1467,7 @@ namespace my {
 
 		if constexpr (Traits::is_always_equal::value || Traits::propagate_on_container_move_assignment::value) {
 			
-			clean_and_steal(std::move(other));
+			clean_and_steal(other);
 			if constexpr (Traits::propagate_on_container_move_assignment::value) {
 				alloc_ = std::move(other.alloc_);
 			}
@@ -1490,11 +1475,11 @@ namespace my {
 		}
 		else {
 			if (this->alloc_ == other.alloc_) {
-				clean_and_steal(std::move(other));
+				clean_and_steal(other);;
 			}
 			else {
 				vector tmp(std::move(other), alloc_);
-				clean_and_steal(std::move(tmp));
+				clean_and_steal(tmp);
 
 				for (size_type i = 0; i < other.size_; i++) {
 					Traits::destroy(other.alloc_, other.data_ + i);
@@ -1504,6 +1489,20 @@ namespace my {
 				}
 			}
 		}
+#ifndef NDEBUG
+		invalidate_all_iterators();
+		for (IteratorNode<T*, T&>* node = other.head_node_; node; node = node->next_) {
+			if (node->iterator_) node->iterator_->container_ = this;
+		}
+		for (IteratorNode<const T*, const T&>* node = other.head_node_const; node; node = node->next_) {
+			if (node->iterator_) node->iterator_->container_ = this;
+		}
+
+		head_node_ = other.head_node_;
+		head_node_const = other.head_node_const;
+		other.head_node_ = nullptr;
+		other.head_node_const = nullptr;
+#endif
 		return *this;
 	}
 
