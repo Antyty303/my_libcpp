@@ -97,6 +97,7 @@ namespace my {
 		void create_map_and_blocks(size_type num_elements);
 		void deallocate_memory() noexcept;
 		void shrink_to_size(size_type new_size) noexcept;
+		void reserve_map(size_type num_blocks) noexcept;
 
 	public: // methods
 		deque() noexcept(noexcept(Alloc()) && std::is_nothrow_copy_constructible_v<Alloc>) : alloc_(), map_alloc_(alloc_) {}
@@ -146,7 +147,7 @@ namespace my {
 
 		iterator begin() noexcept { return begin_; }
 		iterator end() noexcept { return end_; }
-		const_iterator begin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; }
+		const_iterator begin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; } //всё же надо чтоб кастовался
 		const_iterator end() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
 		const_iterator cbegin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; }
 		const_iterator cend() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
@@ -335,7 +336,7 @@ namespace my {
 
 		size_type num_blocks = num_elements / block_size_ + 1;
 
-		map_size_ = ((8ull > num_blocks) ? static_cast<size_type>(8) : (num_blocks + 2));
+		map_size_ = ((8ull > num_blocks) ? 8 : (num_blocks + 4));
 		map_ = map_Traits::allocate(map_alloc_, map_size_);
 		for (size_type i = 0; i < map_size_; ++i) {
 			map_[i] = nullptr;
@@ -396,6 +397,30 @@ namespace my {
 		}
 
 		size_ = new_size;
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::reserve_map(size_type num_blocks) noexcept {
+		if (num_blocks <= map_size_) return;
+
+		size_type new_map_size = num_blocks + 4;
+		map_pointer new_map = map_Traits::allocate(map_alloc_, num_blocks);
+		
+		new_map[0] = new_map[new_map_size - 1] = nullptr;
+		for (size_type i = 0; i < map_size_; ++i) {
+			new_map[i + 2] = map_[i];
+		}
+		new_map[1] = Traits::allocate(alloc_, block_size_);
+		new_map[new_map_size - 2] = Traits::allocate(alloc_, block_size_);
+
+		size_type begin_off = begin_.map_ptr_ - map_ + 2;
+		size_type end_off = end_.map_ptr_ - map_ + 2;
+		begin_.map_ptr_ = new_map + begin_off;
+		end_.map_ptr_ = new_map + end_off;
+
+		map_Traits::deallocate(map_, map_size_);
+		map_ = new_map;
+		map_size_ = new_map_size;
 	}
 #pragma endregion
 
@@ -603,26 +628,159 @@ namespace my {
 #pragma region assign && operators
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::assign(size_type count, const T& val) {
-		
+		if (count == 0) {
+			clear();
+			deallocate_memory();
+			return;
+		}
+
+		if constexpr (std::is_nothrow_copy_constructible_v<T>) {
+			size_t assign_count = std::min(count, size_);
+
+			for (iterator it = begin_; assign_count > 0; --assign_count, ++it) {
+				*it = val;
+			}
+
+			if (count < size_) { shrink_to_size(count); return; }
+			if (count == size_) return;
+
+			size_type extra = count - size_;
+			const size_type remaining_in_end = end_.block_start_ + block_size_ - end_.cur_;
+			size_type blocks_needed = 0;
+			if (extra > remaining_in_end) {
+				blocks_needed = (extra - remaining_in_end + block_size_ - 1) / block_size_;
+			}
+
+			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
+			if (blocks_needed > remaining_in_map) reserve_map(blocks_needed);
+			
+			while (extra > 0) {
+				if (end_.cur_ == end_.block_start_ + block_size_) {
+					++end_.map_ptr_;
+					if (*end_.map_ptr_ == nullptr) {
+						*end_.map_ptr_ = Traits::allocate(alloc_, block_size_);
+					}
+					end_.block_start_ = *end_.map_ptr_;
+					end_.cur_ = end_.block_start_;
+				}
+				Traits::construct(alloc_, std::addressof(*end_), val);
+				++end_.cur_;
+				++size_;
+				--extra;
+			}
+			return;
+		}
+		else {
+			deque tmp(count, val, alloc_);
+			clear();
+			deallocate_memory();
+
+			begin_ = tmp.begin_;
+			end_ = tmp.end_;
+			size_ = tmp.size_;
+			map_ = tmp.map_;
+			map_size_ = tmp.map_size_;
+
+			tmp.begin_ = tmp.end_ = iterator{};
+			tmp.size_ = 0;
+			tmp.map_ = nullptr;
+			tmp.map_size_ = 0;
+		}
 	}
 
 	template<typename T, typename Alloc>
 	template<class It>
 	requires std::forward_iterator<It>
 	inline void deque<T, Alloc>::assign(It first, It last) {
+		size_type count = static_cast<size_type>(std::distance(first, last));
+		if (count == 0) {
+			clear();
+			deallocate_memory();
+			return;
+		}
 
+		if constexpr (std::is_nothrow_copy_constructible_v<T>) {
+			size_t assign_count = std::min(count, size_);
+
+			for (iterator it = begin_; assign_count > 0; --assign_count, ++it, ++first) {
+				*it = *first;
+			}
+
+			if (count < size_) { shrink_to_size(count); return; }
+			if (count == size_) return;
+
+			size_type extra = count - size_;
+			const size_type remaining_in_end = end_.block_start_ + block_size_ - end_.cur_;
+			size_type blocks_needed = 0;
+			if (extra > remaining_in_end) {
+				blocks_needed = (extra - remaining_in_end + block_size_ - 1) / block_size_;
+			}
+
+			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
+			if (blocks_needed > remaining_in_map) reserve_map(blocks_needed);
+			
+			while (extra > 0) {
+				if (end_.cur_ == end_.block_start_ + block_size_) {
+					++end_.map_ptr_;
+					if (*end_.map_ptr_ == nullptr) {
+						*end_.map_ptr_ = Traits::allocate(alloc_, block_size_);
+					}
+					end_.block_start_ = *end_.map_ptr_;
+					end_.cur_ = end_.block_start_;
+				}
+				Traits::construct(alloc_, std::addressof(*end_), *(first));
+				++first;
+				++end_.cur_;
+				++size_;
+				--extra;
+			}
+			return;
+		}
+		else {
+			deque tmp(count, val, alloc_);
+			clear();
+			deallocate_memory();
+
+			begin_ = tmp.begin_;
+			end_ = tmp.end_;
+			size_ = tmp.size_;
+			map_ = tmp.map_;
+			map_size_ = tmp.map_size_;
+
+			tmp.begin_ = tmp.end_ = iterator{};
+			tmp.size_ = 0;
+			tmp.map_ = nullptr;
+			tmp.map_size_ = 0;
+		}
 	}
 
 	template<typename T, typename Alloc>
 	template<class It>
 	requires std::input_iterator<It> && (!std::forward_iterator<It>)
 	inline void deque<T, Alloc>::assign(It first, It last) {
+		deque tmp(alloc_);
+		for (; first != last; ++first) {
+			tmp.push_back(*first);
+		}
 
+		clear();
+		deallocate_memory();
+
+		begin_ = tmp.begin_;
+		end_ = tmp.end_;
+		size_ = tmp.size_;
+		map_ = tmp.map_;
+		map_size_ = tmp.map_size_;
+
+		tmp.begin_ = tmp.end_ = iterator{};
+		tmp.size_ = 0;
+		tmp.map_ = nullptr;
+		tmp.map_size_ = 0;
 	}
 
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::assign(std::initializer_list<T> list) {
-
+		assign(list.begin(), list.end());
 	}
 #pragma endregion //later
 
