@@ -98,6 +98,7 @@ namespace my {
 		void deallocate_memory() noexcept;
 		void shrink_to_size(size_type new_size) noexcept;
 		void reserve_map(size_type num_blocks) noexcept;
+		void clean_and_steal(deque&& other) noexcept;
 
 	public: // methods
 		deque() noexcept(noexcept(Alloc()) && std::is_nothrow_copy_constructible_v<Alloc>) : alloc_(), map_alloc_(alloc_) {}
@@ -156,7 +157,7 @@ namespace my {
 		bool empty() const noexcept { return size_ == 0; }
 		Alloc get_allocator() const noexcept { return alloc_; }
 		size_type max_size() const noexcept { return Traits::max_size(alloc_); }
-		//
+		
 		void assign(size_type count, const T& val);
 		template<class It>
 		requires std::forward_iterator<It>
@@ -177,7 +178,7 @@ namespace my {
 		void clear() noexcept;
 		void resize(size_type new_size);
 		void resize(size_type new_size, const T& val);
-		
+		//
 		void push_back(const T& val);
 		void push_back(T&& val);
 		template<typename... Args>
@@ -206,14 +207,13 @@ namespace my {
 
 		iterator erase(const_iterator pos);
 		iterator erase(const_iterator first, const_iterator last);
-
+		//
 		bool operator!=(const deque& other) const;
 		bool operator==(const deque& other) const;
 		bool operator<=(const deque& other) const;
 		bool operator>=(const deque& other) const;
 		bool operator<(const deque& other) const;
 		bool operator>(const deque& other) const;
-		//
 	};
 #pragma endregion
 
@@ -376,6 +376,7 @@ namespace my {
 			map_ = nullptr;
 			map_size_ = 0;
 			size_ = 0;
+			tmp.begin_ = tmp.end_ = iterator();
 		}
 	}
 
@@ -421,6 +422,33 @@ namespace my {
 		map_Traits::deallocate(map_, map_size_);
 		map_ = new_map;
 		map_size_ = new_map_size;
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::clean_and_steal(deque&& other) noexcept {
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
+		if (map_ != nullptr) {
+			for (map_pointer cur = map_; cur < map_ + map_size_; ++cur) {
+				if (*cur != nullptr) {
+					Traits::deallocate(alloc_, *cur, block_size_);
+					*cur = nullptr;
+				}
+			}
+			map_Traits::deallocate(map_alloc_, map_, map_size_);
+		}
+
+		begin_ = other.begin_;
+		end_ = other.end_;
+		size_ = other.size_;
+		map_ = other.map_;
+		map_size_ = other.map_size_;
+
+		other.begin_ = other.end_ = iterator{};
+		other.size_ = 0;
+		other.map_ = nullptr;
+		other.map_size_ = 0;
 	}
 #pragma endregion
 
@@ -616,8 +644,10 @@ namespace my {
 				Traits::destroy(alloc_, std::addressof(*it));
 			}
 
-			for (map_pointer cur = begin_.map_ptr_; cur <= end_.map_ptr_; ++cur) {
-				Traits::deallocate(alloc_, *cur, block_size_);
+			for (map_pointer cur = map_; cur < map_ + map_size_; ++cur) {
+				if (*cur != nullptr) {
+					Traits::deallocate(alloc_, *cur, block_size_);
+				}
 			}
 
 			map_Traits::deallocate(map_alloc_, map_, map_size_);
@@ -629,7 +659,9 @@ namespace my {
 	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::assign(size_type count, const T& val) {
 		if (count == 0) {
-			clear();
+			for (iterator it = begin_; it != end_; ++it) {
+				Traits::destroy(alloc_, std::addressof(*it));
+			}
 			deallocate_memory();
 			return;
 		}
@@ -672,7 +704,10 @@ namespace my {
 		}
 		else {
 			deque tmp(count, val, alloc_);
-			clear();
+			
+			for (iterator it = begin_; it != end_; ++it) {
+				Traits::destroy(alloc_, std::addressof(*it));
+			}
 			deallocate_memory();
 
 			begin_ = tmp.begin_;
@@ -694,7 +729,9 @@ namespace my {
 	inline void deque<T, Alloc>::assign(It first, It last) {
 		size_type count = static_cast<size_type>(std::distance(first, last));
 		if (count == 0) {
-			clear();
+			for (iterator it = begin_; it != end_; ++it) {
+				Traits::destroy(alloc_, std::addressof(*it));
+			}
 			deallocate_memory();
 			return;
 		}
@@ -738,7 +775,10 @@ namespace my {
 		}
 		else {
 			deque tmp(count, val, alloc_);
-			clear();
+			
+			for (iterator it = begin_; it != end_; ++it) {
+				Traits::destroy(alloc_, std::addressof(*it));
+			}
 			deallocate_memory();
 
 			begin_ = tmp.begin_;
@@ -763,7 +803,9 @@ namespace my {
 			tmp.push_back(*first);
 		}
 
-		clear();
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
 		deallocate_memory();
 
 		begin_ = tmp.begin_;
@@ -782,7 +824,79 @@ namespace my {
 	inline void deque<T, Alloc>::assign(std::initializer_list<T> list) {
 		assign(list.begin(), list.end());
 	}
-#pragma endregion //later
+
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>& deque<T, Alloc>::operator=(const deque& other) {
+		if (this == &other) return *this;
+
+		if constexpr (Traits::propagate_on_container_copy_assignment::value) {
+			if (alloc_ != other.alloc_) {
+				for (iterator it = begin_; it != end_; ++it) {
+					Traits::destroy(alloc_, std::addressof(*it));
+				}
+				deallocate_memory();
+				alloc_ = other.alloc_;
+				map_alloc_ = other.map_alloc_;
+			}
+		}
+
+		assign(other.begin_, other.end_);
+		return *this;
+	}
+	
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>& deque<T, Alloc>::operator=(deque&& other) noexcept(
+		Traits::propagate_on_container_move_assignment::value || Traits::is_always_equal::value)
+	{
+		if (this == &other) return *this;
+
+		if (other.size_ == 0) {
+			for (iterator it = begin_; it != end_; ++it) {
+				Traits::destroy(alloc_, std::addressof(*it));
+			}
+			deallocate_memory();
+
+			if constexpr (Traits::propagate_on_container_move_assignment::value) {
+				alloc_ = std::move(other.alloc_);
+				map_alloc_ = std::move(other.map_alloc_);
+			}
+
+			other.deallocate_memory();
+			return *this;
+		}
+
+		if constexpr (Traits::is_always_equal::value || Traits::propagate_on_container_move_assignment::value) {
+
+			clean_and_steal(std::move(other));
+			if constexpr (Traits::propagate_on_container_move_assignment::value) {
+				alloc_ = std::move(other.alloc_);
+				map_alloc_ = std::move(other.map_alloc_);
+			}
+
+		}
+		else {
+			if (this->alloc_ == other.alloc_) {
+				clean_and_steal(std::move(other));
+			}
+			else {
+				deque tmp(std::move(other), alloc_);
+				clean_and_steal(std::move(tmp));
+
+				for (iterator it = other.begin_; it != other.end_; ++it) {
+					Traits::destroy(other.alloc_, std::addressof(*it));
+				}
+				other.deallocate_memory();
+			}
+		}
+		return *this;
+	}
+	
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>& deque<T, Alloc>::operator=(std::initializer_list<T> list) {
+		assign(list.begin(), list.end());
+		return *this;
+	}
+#pragma endregion
 
 #pragma region swap && size
 	template<typename T, typename Alloc>
