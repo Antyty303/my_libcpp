@@ -956,7 +956,9 @@ namespace my {
 			++tmp.size_;
 		}
 
-		clear();
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
 		deallocate_memory();
 		map_ = tmp.map_;
 		map_size_ = tmp.map_size_;
@@ -1023,7 +1025,9 @@ namespace my {
 			++tmp.size_;
 		}
 
-		clear();
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
 		deallocate_memory();
 		map_ = tmp.map_;
 		map_size_ = tmp.map_size_;
@@ -1063,7 +1067,9 @@ namespace my {
 			++tmp.size_;
 		}
 
-		clear();
+		for (iterator it = begin_; it != end_; ++it) {
+			Traits::destroy(alloc_, std::addressof(*it));
+		}
 		deallocate_memory();
 		map_ = tmp.map_;
 		map_size_ = tmp.map_size_;
@@ -1141,4 +1147,119 @@ namespace my {
 		return (a != end_) && (b == other.end_);
 	}
 #pragma endregion
+
+#pragma region back
+	template<typename T, typename Alloc>
+	template<typename... Args>
+	inline reference emplace_back(Args&&... args) {
+		if (size_ == max_size()) throw std::length_error("deque length exceeds max_size");
+
+		if (map_ == nullptr) {
+			create_map_and_blocks(1);
+			size_ = 0;
+			end_ = begin_;
+		}
+		else if (end_.cur_ == end_.block_start_ && end_.map_ptr_ != begin_.map_ptr_) {
+			if (end_.map_ptr_ == map_ + map_size_) {
+				reallocate_map(map_size_);
+			}
+
+			if (*end_.map_ptr_ == nullptr) {
+				*end_.map_ptr_ = Traits::allocate(alloc_, block_size_);
+				end_.block_start_ = *end_.map_ptr_;
+				end_.block_end_ = *end_.map_ptr + block_size_;
+				end_.cur_ = end_.block_start_;
+			}
+		}
+		Traits::construct(alloc_, std::addressof(*end_), std::forward<Args>(args)...);
+		++end_;
+		++size_;
+
+		return *(end_ - 1);
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::push_back(const T& val) {
+		emplace_back(val);
+	}
+	
+	template<typename T, typename Alloc>
+	inline void push_back(T&& val) {
+		emplace_back(std::move(val));
+	}
+	
+	template<typename T, typename Alloc>
+	inline void pop_back() {
+		if (size_ == 0) throw std::out_of_range("Error: deque::pop_back() called on empty deque");
+
+		if (end_.cur_ == end_.block_start_ && end_map_ptr_ != begin_.map_ptr_) {
+			if ((end_.map_ptr_ + 1) < map_ + map_size_ && *(end_.map_ptr_ + 1) != nullptr) {
+				Traits::deallocate(alloc_, *(end_.map_ptr_ + 1), block_size_);
+				*(end_.map_ptr_ + 1) = nullptr;
+			}
+		}
+		--end_;
+		Traits::destroy(alloc_, std::addressof(*end_));
+		--size_;
+	}
+#pragma endregion
+
+#pragma region front
+	template<typename T, typename Alloc>
+	template<typename... Args>
+	inline reference emplace_front(Args&&... args) {
+		if (size_ == max_size()) throw std::length_error("deque length exceeds max_size");
+
+		if (map_ == nullptr) {
+			create_map_and_blocks(1);
+			size_ = 0;
+			end_ = begin_;
+		}
+		
+		if (begin_.cur_ == begin_.block_start_) {
+			if (begin_.map_ptr_ == map_) {
+				reallocate_map(map_size_);
+			}
+
+			if (*(begin_.map_ptr_ - 1) == nullptr) {
+				*(begin_.map_ptr_ - 1) = Traits::allocate(alloc_, block_size_);
+			}
+		}
+		Traits::construct(alloc_, std::addressof(*(begin_ - 1)), std::forward<Args>(args)...);
+		--begin_;
+		++size_;
+
+		return *begin_;
+	}
+
+	template<typename T, typename Alloc>
+	inline void deque<T, Alloc>::push_front(const T& val) {
+		emplace_front(val);
+	}
+
+	template<typename T, typename Alloc>
+	inline void push_front(T&& val) {
+		emplace_front(std::move(val));
+	}
+
+	template<typename T, typename Alloc>
+	inline void pop_front() {
+		if (size_ == 0) throw std::out_of_range("Error: deque::pop_front() called on empty deque");
+
+		if (begin_.cur_ == begin_.block_end_ - 1) {
+			if (begin_.map_ptr_ > map_ && *(begin_.map_ptr_ - 1) != nullptr) {
+				Traits::deallocate(alloc_, *(begin_.map_ptr_ - 1), block_size_);
+				*(begin_.map_ptr_ - 1) = nullptr;
+			}
+		}
+		Traits::destroy(alloc_, std::addressof(*begin_));
+		++begin_;
+		--size_;
+	}
+#pragma endregion
+
+#pragma region middle
+
+#pragma endregion
+
 }
