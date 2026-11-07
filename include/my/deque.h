@@ -61,7 +61,7 @@ namespace my {
 			PtrT block_start_ = nullptr;
 			PtrT block_end_ = nullptr; //start + block_size
 
-			const deque<T, Alloc>* container = nullptr;
+			const deque<T, Alloc>* container_ = nullptr;
 
 		public:
 			Iterator() = default;
@@ -86,10 +86,10 @@ namespace my {
 
 			difference_type operator-(const Iterator& other) const;
 
-			bool operator<(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ < other.cur_) : (map_ptr_ < other.map_ptr_) }
-			bool operator<=(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ <= other.cur_) : (map_ptr_ < other.map_ptr_) }
-			bool operator>(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ > other.cur_) : (map_ptr_ > other.map_ptr_) }
-			bool operator>=(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ >= other.cur_) : (map_ptr_ > other.map_ptr_) }
+			bool operator<(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ < other.cur_) : (map_ptr_ < other.map_ptr_); }
+			bool operator<=(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ <= other.cur_) : (map_ptr_ < other.map_ptr_); }
+			bool operator>(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ > other.cur_) : (map_ptr_ > other.map_ptr_); }
+			bool operator>=(const Iterator& other) const { return (map_ptr_ == other.map_ptr_) ? (cur_ >= other.cur_) : (map_ptr_ > other.map_ptr_); }
 			bool operator==(const Iterator& other) const { return cur_ == other.cur_; }
 			bool operator!=(const Iterator& other) const { return cur_ != other.cur_; }
 		};
@@ -120,15 +120,15 @@ namespace my {
 		deque(deque&& other, const Alloc& alloc) noexcept(Traits::is_always_equal::value);
 		~deque() noexcept;
 
-		reference operator[](size_type index) { return *(begin_ + pos); }
-		const_reference operator[](size_type index) const { return *(begin_ + pos); }
+		reference operator[](size_type index) { return *(begin_ + index); }
+		const_reference operator[](size_type index) const { return *(begin_ + index); }
 		reference at(size_type index) {
 			if (index >= size_) throw std::out_of_range("deque::at() index out of range");
-			return *(begin_ + pos);
+			return *(begin_ + index);
 		}
 		const_reference at(size_type index) const {
 			if (index >= size_) throw std::out_of_range("deque::at() index out of range");
-			return *(begin_ + pos);
+			return *(begin_ + index);
 		}
 
 		reference front() {
@@ -238,7 +238,7 @@ namespace my {
 		++cur_;
 		if (cur_ == block_end_) {
 			++map_ptr_;
-			if (map_ptr_ == container->map_ + container->map_size_) {
+			if (map_ptr_ == container_->map_ + container_->map_size_) {
 				cur_ = block_start_ = block_end_ = nullptr;
 			}
 			else {
@@ -271,7 +271,7 @@ namespace my {
 			map_ptr_ += (offset - block_size_ + 1) / block_size_;
 		}
 		
-		if (new_map_ptr == container->map_ + container_->map_size_) {
+		if (map_ptr_ == container_->map_ + container_->map_size_) {
 			cur_ = block_start_ = block_end_ = nullptr;
 		}
 		else {
@@ -389,7 +389,7 @@ namespace my {
 			map_ = nullptr;
 			map_size_ = 0;
 			size_ = 0;
-			tmp.begin_ = tmp.end_ = iterator();
+			begin_ = end_ = iterator();
 		}
 	}
 
@@ -516,7 +516,7 @@ namespace my {
 		try {
 			iterator it = begin_;
 			for (; first != last; ++i, ++first, ++it) {
-				Traits::construct(alloc_, std::addressof(*dst), *first);
+				Traits::construct(alloc_, std::addressof(*it), *first);
 			}
 		}
 		catch (...) {
@@ -553,7 +553,7 @@ namespace my {
 		size_type i = 0;
 		try {
 			iterator it = begin_;
-			for (auto src = init.begin(); src != init.end(); ++i, ++src, ++it) {
+			for (auto src = list.begin(); src != list.end(); ++i, ++src, ++it) {
 				Traits::construct(alloc_, std::addressof(*it), *src);
 			}
 		}
@@ -797,7 +797,7 @@ namespace my {
 			return;
 		}
 		else {
-			deque tmp(count, val, alloc_);
+			deque tmp(first, last, alloc_);
 			
 			for (iterator it = begin_; it != end_; ++it) {
 				Traits::destroy(alloc_, std::addressof(*it));
@@ -1151,7 +1151,7 @@ namespace my {
 #pragma region back
 	template<typename T, typename Alloc>
 	template<typename... Args>
-	inline reference emplace_back(Args&&... args) {
+	inline deque<T, Alloc>::reference deque<T, Alloc>::emplace_back(Args&&... args) {
 		if (size_ == max_size()) throw std::length_error("deque length exceeds max_size");
 
 		if (map_ == nullptr) {
@@ -1184,15 +1184,15 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
-	inline void push_back(T&& val) {
+	inline void deque<T, Alloc>::push_back(T&& val) {
 		emplace_back(std::move(val));
 	}
 	
 	template<typename T, typename Alloc>
-	inline void pop_back() {
+	inline void deque<T, Alloc>::pop_back() {
 		if (size_ == 0) throw std::out_of_range("Error: deque::pop_back() called on empty deque");
 
-		if (end_.cur_ == end_.block_start_ && end_map_ptr_ != begin_.map_ptr_) {
+		if (end_.cur_ == end_.block_start_ && end_.map_ptr_ != begin_.map_ptr_) {
 			if ((end_.map_ptr_ + 1) < map_ + map_size_ && *(end_.map_ptr_ + 1) != nullptr) {
 				Traits::deallocate(alloc_, *(end_.map_ptr_ + 1), block_size_);
 				*(end_.map_ptr_ + 1) = nullptr;
@@ -1207,7 +1207,7 @@ namespace my {
 #pragma region front
 	template<typename T, typename Alloc>
 	template<typename... Args>
-	inline reference emplace_front(Args&&... args) {
+	inline deque<T, Alloc>::reference deque<T, Alloc>::emplace_front(Args&&... args) {
 		if (size_ == max_size()) throw std::length_error("deque length exceeds max_size");
 
 		if (map_ == nullptr) {
@@ -1238,12 +1238,12 @@ namespace my {
 	}
 
 	template<typename T, typename Alloc>
-	inline void push_front(T&& val) {
+	inline void deque<T, Alloc>::push_front(T&& val) {
 		emplace_front(std::move(val));
 	}
 
 	template<typename T, typename Alloc>
-	inline void pop_front() {
+	inline void deque<T, Alloc>::pop_front() {
 		if (size_ == 0) throw std::out_of_range("Error: deque::pop_front() called on empty deque");
 
 		if (begin_.cur_ == begin_.block_end_ - 1) {
