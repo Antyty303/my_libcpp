@@ -61,9 +61,11 @@ namespace my {
 			PtrT block_start_ = nullptr;
 			PtrT block_end_ = nullptr; //start + block_size
 
+			const deque<T, Alloc>* container = nullptr;
+
 		public:
 			Iterator() = default;
-			Iterator(PtrT ptr, map_pointer map_ptr);
+			Iterator(PtrT ptr, map_pointer map_ptr, const deque* container);
 			Iterator(const Iterator& other) = default;
 
 			RefT operator*() const { return *cur_; }
@@ -148,10 +150,10 @@ namespace my {
 
 		iterator begin() noexcept { return begin_; }
 		iterator end() noexcept { return end_; }
-		const_iterator begin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; } //всё же надо чтоб кастовался
-		const_iterator end() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
-		const_iterator cbegin() const noexcept { return { begin_.cur_, begin_.map_ptr_ }; }
-		const_iterator cend() const noexcept { return { end_.cur_, end_.map_ptr_ }; }
+		const_iterator begin() const noexcept { return { begin_.cur_, begin_.map_ptr_, this }; } //всё же надо чтоб кастовался
+		const_iterator end() const noexcept { return { end_.cur_, end_.map_ptr_, this }; }
+		const_iterator cbegin() const noexcept { return { begin_.cur_, begin_.map_ptr_, this }; }
+		const_iterator cend() const noexcept { return { end_.cur_, end_.map_ptr_, this }; }
 
 		size_type size() const noexcept { return size_; }
 		bool empty() const noexcept { return size_ == 0; }
@@ -220,12 +222,13 @@ namespace my {
 #pragma region iterator functions
 	template<typename T, typename Alloc>
 	template<typename PtrT, typename RefT>
-	inline deque<T, Alloc>::Iterator<PtrT, RefT>::Iterator(PtrT ptr, map_pointer map_ptr) {
-		if (map_ptr != nullptr) {
+	inline deque<T, Alloc>::Iterator<PtrT, RefT>::Iterator(PtrT ptr, map_pointer map_ptr, const deque* container) {
+		if (map_ptr != nullptr && *map_ptr_ != nullptr) {
 			cur_ = ptr;
 			map_ptr_ = map_ptr;
 			block_start_ = *map_ptr;
 			block_end_ = *map_ptr + block_size_;
+			container_ = container;
 		}
 	}
 
@@ -235,9 +238,14 @@ namespace my {
 		++cur_;
 		if (cur_ == block_end_) {
 			++map_ptr_;
-			block_start_ = *map_ptr_;
-			block_end_ = block_start_ + block_size_;
-			cur_ = block_start_;
+			if (map_ptr_ == container->map_ + container->map_size_) {
+				cur_ = block_start_ = block_end_ = nullptr;
+			}
+			else {
+				block_start_ = *map_ptr_;
+				block_end_ = block_start_ + block_size_;
+				cur_ = block_start_;
+			}
 		}
 		return *this;
 	}
@@ -262,10 +270,15 @@ namespace my {
 		else {
 			map_ptr_ += (offset - block_size_ + 1) / block_size_;
 		}
-
-		block_start_ = *map_ptr_;
-		block_end_ = block_start_ + block_size_;
-		cur_ = block_start_ + (offset - (map_ptr_ - tmp_map_ptr) * block_size_);
+		
+		if (new_map_ptr == container->map_ + container_->map_size_) {
+			cur_ = block_start_ = block_end_ = nullptr;
+		}
+		else {
+			block_start_ = *map_ptr_;
+			block_end_ = block_start_ + block_size_;
+			cur_ = block_start_ + (offset - (map_ptr_ - tmp_map_ptr) * block_size_);
+		}
 
 		return *this;
 	}
@@ -285,7 +298,7 @@ namespace my {
 			--map_ptr_;
 			block_start_ = *map_ptr_;
 			block_end_ = block_start_ + block_size_;
-			cur_ = block_start_;
+			cur_ = block_end_;
 		}
 		--cur_;
 		return *this;
@@ -359,7 +372,7 @@ namespace my {
 			throw;
 		}
 		size_ = num_elements;
-		begin_ = iterator(*new_begin, new_begin);
+		begin_ = iterator(*new_begin, new_begin, this);
 		end_ = begin_ + num_elements;
 	}
 
@@ -388,6 +401,8 @@ namespace my {
 		if (end_.cur_ == end_.block_start_ && end_.map_ptr_ != begin_.map_ptr_) {
 			Traits::deallocate(alloc_, *end_.map_ptr_, block_size_);
 			*end_.map_ptr_ = nullptr;
+			end_.block_start_ = end_.cur_ = nullptr;
+			end_.block_end_ = end_.block_start_ + block_size_;
 		}
 
 		for (map_pointer cur = end_.map_ptr_ + 1; cur < map_ + map_size_; ++cur) {
@@ -677,13 +692,16 @@ namespace my {
 			if (count == size_) return;
 
 			size_type extra = count - size_;
-			const size_type remaining_in_end = end_.block_start_ + block_size_ - end_.cur_;
+			const size_type remaining_in_end = (end_.map_ptr_ != map_ + map_size_) ? (end_.block_start_ + block_size_ - end_.cur_) : 0;
+
 			size_type blocks_needed = 0;
 			if (extra > remaining_in_end) {
 				blocks_needed = (extra - remaining_in_end + block_size_ - 1) / block_size_;
 			}
 
-			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
+			const size_type remaining_in_map = map_size_ - (end_.map_ptr_ - map_);
+			if (remaining_in_map != 0) --remaining_in_map;
+
 			if (blocks_needed > remaining_in_map) reallocate_map(blocks_needed);
 			
 			while (extra > 0) {
@@ -693,6 +711,7 @@ namespace my {
 						*end_.map_ptr_ = Traits::allocate(alloc_, block_size_);
 					}
 					end_.block_start_ = *end_.map_ptr_;
+					end_.block_end_ = *end_.map_ptr + block_size_;
 					end_.cur_ = end_.block_start_;
 				}
 				Traits::construct(alloc_, std::addressof(*end_), val);
@@ -747,13 +766,16 @@ namespace my {
 			if (count == size_) return;
 
 			size_type extra = count - size_;
-			const size_type remaining_in_end = end_.block_start_ + block_size_ - end_.cur_;
+			const size_type remaining_in_end = (end_.map_ptr_ != map_ + map_size_) ? (end_.block_start_ + block_size_ - end_.cur_) : 0;
+			
 			size_type blocks_needed = 0;
 			if (extra > remaining_in_end) {
 				blocks_needed = (extra - remaining_in_end + block_size_ - 1) / block_size_;
 			}
 
-			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
+			const size_type remaining_in_map = map_size_ - (end_.map_ptr_ - map_);
+			if (remaining_in_map != 0) --remaining_in_map; 
+			
 			if (blocks_needed > remaining_in_map) reallocate_map(blocks_needed);
 			
 			while (extra > 0) {
@@ -763,6 +785,7 @@ namespace my {
 						*end_.map_ptr_ = Traits::allocate(alloc_, block_size_);
 					}
 					end_.block_start_ = *end_.map_ptr_;
+					end_.block_end_ = *end_.map_ptr + block_size_;
 					end_.cur_ = end_.block_start_;
 				}
 				Traits::construct(alloc_, std::addressof(*end_), *(first));
@@ -967,7 +990,7 @@ namespace my {
 			map_pointer central_ptr = map_ + map_size_ / 2;
 			*central_ptr = block_to_keep;
 
-			begin_ = iterator(block_to_keep, central_ptr);
+			begin_ = iterator(block_to_keep, central_ptr, this);
 			end_ = begin_;
 		}
 
