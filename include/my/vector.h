@@ -839,7 +839,7 @@ namespace my {
 
 	template<typename T, typename Alloc>
 	template<typename PtrT, typename RefT>
-	inline vector<T,Alloc>::difference_type vector<T, Alloc>::DebugIterator<PtrT, RefT>::operator-(const DebugIterator<PtrT, RefT>& other) const {
+	inline vector<T,Alloc>::DebugIterator<PtrT, RefT>::difference_type vector<T, Alloc>::DebugIterator<PtrT, RefT>::operator-(const DebugIterator<PtrT, RefT>& other) const {
 		validity_check_for_two(*this, other);
 		return ptr_ - other.ptr_;
 	}
