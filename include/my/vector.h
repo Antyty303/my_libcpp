@@ -431,6 +431,21 @@ namespace my {
 		other.size_ = 0;
 		other.capacity_ = 0;
 		other.data_ = nullptr;
+
+#ifndef NDEBUG
+		invalidate_all_iterators();
+		for (IteratorNode<T*, T&>* node = other.head_node_; node; node = node->next_) {
+			if (node->iterator_) node->iterator_->container_ = this;
+		}
+		for (IteratorNode<const T*, const T&>* node = other.head_node_const; node; node = node->next_) {
+			if (node->iterator_) node->iterator_->container_ = this;
+		}
+
+		head_node_ = other.head_node_;
+		head_node_const = other.head_node_const;
+		other.head_node_ = nullptr;
+		other.head_node_const = nullptr;
+#endif
 	}
 #pragma endregion
 
@@ -1467,7 +1482,7 @@ namespace my {
 
 		if constexpr (Traits::is_always_equal::value || Traits::propagate_on_container_move_assignment::value) {
 			
-			clean_and_steal(other);
+			clean_and_steal(std::move(other));
 			if constexpr (Traits::propagate_on_container_move_assignment::value) {
 				alloc_ = std::move(other.alloc_);
 			}
@@ -1475,11 +1490,11 @@ namespace my {
 		}
 		else {
 			if (this->alloc_ == other.alloc_) {
-				clean_and_steal(other);;
+				clean_and_steal(std::move(other));
 			}
 			else {
 				vector tmp(std::move(other), alloc_);
-				clean_and_steal(tmp);
+				clean_and_steal(std::move(tmp));
 
 				for (size_type i = 0; i < other.size_; i++) {
 					Traits::destroy(other.alloc_, other.data_ + i);
@@ -1489,20 +1504,6 @@ namespace my {
 				}
 			}
 		}
-#ifndef NDEBUG
-		invalidate_all_iterators();
-		for (IteratorNode<T*, T&>* node = other.head_node_; node; node = node->next_) {
-			if (node->iterator_) node->iterator_->container_ = this;
-		}
-		for (IteratorNode<const T*, const T&>* node = other.head_node_const; node; node = node->next_) {
-			if (node->iterator_) node->iterator_->container_ = this;
-		}
-
-		head_node_ = other.head_node_;
-		head_node_const = other.head_node_const;
-		other.head_node_ = nullptr;
-		other.head_node_const = nullptr;
-#endif
 		return *this;
 	}
 
