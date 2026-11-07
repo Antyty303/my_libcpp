@@ -97,7 +97,7 @@ namespace my {
 		void create_map_and_blocks(size_type num_elements);
 		void deallocate_memory() noexcept;
 		void shrink_to_size(size_type new_size) noexcept;
-		void reserve_map(size_type num_blocks) noexcept;
+		void reallocate_map(size_type num_blocks) noexcept;
 		void clean_and_steal(deque&& other) noexcept;
 
 	public: // methods
@@ -178,11 +178,11 @@ namespace my {
 		void clear() noexcept;
 		void resize(size_type new_size);
 		void resize(size_type new_size, const T& val);
-		//
-		void push_back(const T& val);
-		void push_back(T&& val);
+		
 		template<typename... Args>
 		reference emplace_back(Args&&... args);
+		void push_back(const T& val);
+		void push_back(T&& val);
 		void pop_back();
 
 		void push_front(const T& val);
@@ -190,7 +190,7 @@ namespace my {
 		template<typename... Args>
 		reference emplace_front(Args&&... args);
 		void pop_front();
-
+		//
 		iterator insert(const_iterator pos, const T& val);
 		iterator insert(const_iterator pos, T&& val);
 		iterator insert(const_iterator pos, size_type count, const T& val);
@@ -336,7 +336,7 @@ namespace my {
 
 		size_type num_blocks = num_elements / block_size_ + 1;
 
-		map_size_ = ((8ull > num_blocks) ? 8 : (num_blocks + 4));
+		map_size_ = ((4ull > num_blocks) ? 8 : (num_blocks + 4));
 		map_ = map_Traits::allocate(map_alloc_, map_size_);
 		for (size_type i = 0; i < map_size_; ++i) {
 			map_[i] = nullptr;
@@ -401,7 +401,7 @@ namespace my {
 	}
 
 	template<typename T, typename Alloc>
-	inline void deque<T, Alloc>::reserve_map(size_type num_blocks) noexcept {
+	inline void deque<T, Alloc>::reallocate_map(size_type num_blocks) noexcept {
 		if (num_blocks <= map_size_) return;
 
 		size_type new_map_size = num_blocks + 4;
@@ -684,7 +684,7 @@ namespace my {
 			}
 
 			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
-			if (blocks_needed > remaining_in_map) reserve_map(blocks_needed);
+			if (blocks_needed > remaining_in_map) reallocate_map(blocks_needed);
 			
 			while (extra > 0) {
 				if (end_.cur_ == end_.block_start_ + block_size_) {
@@ -754,7 +754,7 @@ namespace my {
 			}
 
 			const size_type remaining_in_map = (map_ + map_size_) - (end_.map_ptr_ + 1);
-			if (blocks_needed > remaining_in_map) reserve_map(blocks_needed);
+			if (blocks_needed > remaining_in_map) reallocate_map(blocks_needed);
 			
 			while (extra > 0) {
 				if (end_.cur_ == end_.block_start_ + block_size_) {
