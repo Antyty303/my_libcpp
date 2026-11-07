@@ -5,6 +5,7 @@
 #include <type_traits>
 #include <utility>
 #include <memory>
+#include <iterator> // std::random_access_iterator_tag
 
 #ifndef NDEBUG
 #define IF_CONFIGURATION_IS_DEBUG(code) code
@@ -16,7 +17,7 @@
 
 namespace my {
 #pragma region Class
-	template<typename T, typename Alloc = std::allocator<T>>
+	template<typename T, typename Alloc = ::std::allocator<T>>
 	class vector {
 	public: //assert && using
 		
@@ -54,6 +55,12 @@ namespace my {
 
 		template <typename PtrT, typename RefT>
 		struct DebugIterator {
+			using iterator_category = std::random_access_iterator_tag;
+			using value_type = std::remove_const_t<std::remove_pointer_t<PtrT>>;
+			using difference_type = std::ptrdiff_t;
+			using pointer = PtrT;
+			using reference = RefT;
+
 			PtrT ptr_ = nullptr;
 			const vector<T, Alloc>* container_ = nullptr;
 			IteratorNode<PtrT, RefT>* node_ = nullptr;
@@ -163,6 +170,8 @@ namespace my {
 
 		template<typename... Args>
 		void reserve_and_emplace(size_type new_capacity, size_type index, Args&&... args);
+
+		void clean_and_steal(vector&& other) noexcept;
 
 	public: //methods
 
@@ -404,6 +413,24 @@ namespace my {
 		size_++;
 
 		IF_CONFIGURATION_IS_DEBUG(invalidate_all_iterators();)
+	}
+
+	template<typename T, typename Alloc>
+	inline void vector<T, Alloc>::clean_and_steal(vector&& other) noexcept {
+		for (size_type i = 0; i < size_; i++) {
+			Traits::destroy(alloc_, data_ + i);
+		}
+		if (data_) {
+			Traits::deallocate(alloc_, data_, capacity_);
+		}
+
+		size_ = other.size_;
+		capacity_ = other.capacity_;
+		data_ = other.data_;
+
+		other.size_ = 0;
+		other.capacity_ = 0;
+		other.data_ = nullptr;
 	}
 #pragma endregion
 
@@ -1406,20 +1433,19 @@ namespace my {
 	{
 		if (&other == this) return *this;
 
-		for (size_type i = 0; i < size_; i++) {
-			Traits::destroy(alloc_, data_ + i);
-		}
-		if (data_) {
-			Traits::deallocate(alloc_, data_, capacity_);
-		}
-
-		size_ = other.size_;
-		capacity_ = other.capacity_;
-
 		if (other.capacity_ == 0) {
+			for (size_type i = 0; i < size_; i++) {
+				Traits::destroy(alloc_, data_ + i);
+			}
+			if (data_) {
+				Traits::deallocate(alloc_, data_, capacity_);
+			}
+
 			if constexpr (Traits::propagate_on_container_move_assignment::value) {
 				alloc_ = std::move(other.alloc_);
 			}
+			size_ = 0;
+			capacity_ = 0;
 			data_ = nullptr;
 
 #ifndef NDEBUG
@@ -1441,29 +1467,19 @@ namespace my {
 
 		if constexpr (Traits::is_always_equal::value || Traits::propagate_on_container_move_assignment::value) {
 			
+			clean_and_steal(other);
 			if constexpr (Traits::propagate_on_container_move_assignment::value) {
 				alloc_ = std::move(other.alloc_);
 			}
-			data_ = other.data_;
 
-			other.size_ = 0;
-			other.capacity_ = 0;
-			other.data_ = nullptr;
 		}
 		else {
 			if (this->alloc_ == other.alloc_) {
-				data_ = other.data_;
-
-				other.size_ = 0;
-				other.capacity_ = 0;
-				other.data_ = nullptr;
+				clean_and_steal(other);;
 			}
 			else {
-				data_ = Traits::allocate(alloc_, other.capacity_);
-
-				for (size_type i = 0; i < other.size_; i++) {
-					Traits::construct(alloc_, data_ + i, std::move(other.data_[i]));
-				}
+				vector tmp(std::move(other), alloc_);
+				clean_and_steal(tmp);
 
 				for (size_type i = 0; i < other.size_; i++) {
 					Traits::destroy(other.alloc_, other.data_ + i);
@@ -1471,10 +1487,6 @@ namespace my {
 				if (other.data_) {
 					Traits::deallocate(other.alloc_, other.data_, other.capacity_);
 				}
-
-				other.data_ = nullptr;
-				other.size_ = 0;
-				other.capacity_ = 0;
 			}
 		}
 #ifndef NDEBUG
