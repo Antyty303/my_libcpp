@@ -62,11 +62,11 @@ namespace my {
         bool empty() const { return c.empty(); }
         size_type size() const { return c.size(); }
 
-        void push(const value_type& value);
-        void push(value_type&& value);
+        void push(const value_type& value) { c.push_back(value); }
+        void push(value_type&& value) { c.push_back(std::move(value)); }
         template<class... Args>
-        decltype(auto) emplace(Args&&... args);
-        void pop();
+        decltype(auto) emplace(Args&&... args) { return c.emplace_back(std::forward<Args>(args)...); }
+        void pop() { c.pop_back(); }
 
         void swap(stack& other) noexcept(noexcept(std::swap(c, other.c))) { std::swap(c, other.c); }
     };
