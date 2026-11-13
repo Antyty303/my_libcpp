@@ -57,10 +57,10 @@ namespace my {
         stack& operator=(const stack&) = default;
         stack& operator=(stack&&) = default;
 
-        reference top();
-        const_reference top() const;
-        bool empty() const;
-        size_type size() const;
+        reference top() { return c.back(); }
+        const_reference top() const { return c.back(); }
+        bool empty() const { return c.empty(); }
+        size_type size() const { return c.size(); }
 
         void push(const value_type& value);
         void push(value_type&& value);
@@ -68,13 +68,41 @@ namespace my {
         decltype(auto) emplace(Args&&... args);
         void pop();
 
-        void swap(stack& other) noexcept(noexcept(std::swap(c, other.c)));
-
-        bool operator<(const stack& other) const;
-        bool operator<=(const stack& other) const;
-        bool operator>(const stack& other) const;
-        bool operator>=(const stack& other) const;
-        bool operator==(const stack& other) const;
-        bool operator!=(const stack& other) const;
+        void swap(stack& other) noexcept(noexcept(std::swap(c, other.c))) { std::swap(c, other.c); }
     };
+
+    template<class T, class Container>
+    bool operator==(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    bool operator!=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    bool operator<(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    bool operator<=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    bool operator>(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    bool operator>=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+        return lhs.c == rhs.c;
+    }
+
+    template<class T, class Container>
+    void swap(stack<T, Container>& lhs, stack<T, Container>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
+        lhs.swap(rhs);
+    }
 }

@@ -133,19 +133,19 @@ namespace my {
 		}
 
 		reference front() {
-			if (size_ == 0) throw std::out_of_range("vector::front() on empty deque");
+			if (size_ == 0) throw std::out_of_range("deque::front() on empty deque");
 			return *begin_;
 		}
 		const_reference front() const {
-			if (size_ == 0) throw std::out_of_range("vector::front() on empty deque");
+			if (size_ == 0) throw std::out_of_range("deque::front() on empty deque");
 			return *begin_;
 		}
 		reference back() {
-			if (size_ == 0) throw std::out_of_range("vector::back() on empty deque");
+			if (size_ == 0) throw std::out_of_range("deque::back() on empty deque");
 			return *(end_ - 1);
 		}
 		const_reference back() const {
-			if (size_ == 0) throw std::out_of_range("vector::back() on empty deque");
+			if (size_ == 0) throw std::out_of_range("deque::back() on empty deque");
 			return *(end_ - 1);
 		}
 
@@ -940,6 +940,11 @@ namespace my {
 	}
 	
 	template<typename T, typename Alloc>
+	constexpr void swap(deque<T, Alloc>& lhs, deque<T, Alloc>& rhs) {
+		lhs.swap(rhs);
+	}
+
+	template<typename T, typename Alloc>
 	inline void deque<T, Alloc>::shrink_to_fit() {
 		if (size_ == 0) {
 			deallocate_memory();
@@ -1146,6 +1151,36 @@ namespace my {
 			if (*b < *a) return true;
 		}
 		return (a != end_) && (b == other.end_);
+	}
+
+	template<typename T, typename Alloc>
+	bool operator==(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs == rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator!=(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs != rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator<(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs < rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator<=(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs <= rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator>(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs > rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator>=(const deque<T, Alloc>& lhs, const deque<T, Alloc>& rhs) {
+		return lhs >= rhs;
 	}
 #pragma endregion
 
