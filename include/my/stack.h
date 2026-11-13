@@ -6,7 +6,7 @@
 #include <iterator>
 
 namespace my {
-    template<typename T, typename Container = ::vector<T>>
+    template<typename T, typename Container = ::my::vector<T>>
     class stack {
     public:
         using container_type = Container;
