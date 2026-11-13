@@ -57,8 +57,10 @@ namespace my {
         queue& operator=(const queue&) = default;
         queue& operator=(queue&&) = default;
 
-        reference top() { return c.back(); }
-        const_reference top() const { return c.back(); }
+        reference front() { return c.front(); }
+        const_reference front() const { return c.front(); }
+        reference back() { return c.back(); }
+        const_reference back() const { return c.back(); }
         bool empty() const { return c.empty(); }
         size_type size() const { return c.size(); }
 
@@ -66,7 +68,7 @@ namespace my {
         void push(value_type&& value) { c.push_back(std::move(value)); }
         template<class... Args>
         decltype(auto) emplace(Args&&... args) { return c.emplace_back(std::forward<Args>(args)...); }
-        void pop() { c.pop_back(); }
+        void pop() { c.pop_front(); }
 
         void swap(queue& other) noexcept(noexcept(std::swap(c, other.c))) { std::swap(c, other.c); }
     };
