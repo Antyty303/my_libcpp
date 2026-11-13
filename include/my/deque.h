@@ -2,6 +2,7 @@
 #include <initializer_list>
 #include <stdexcept>
 #include <type_traits>
+#include <utility>
 #include <memory>
 #include <algorithm> //swap
 #include <iterator> // std::random_access_iterator_tag
