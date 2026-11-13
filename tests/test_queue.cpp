@@ -20,7 +20,7 @@ T MakeValue(int i) {
     }
 }
 
-using queueTypes = ::testing::Types<
+using QueueTypes = ::testing::Types<
     my::queue<int, std::deque<int>>,
     my::queue<int, std::list<int>>,
 
@@ -32,21 +32,21 @@ using queueTypes = ::testing::Types<
 >;
 
 template <typename T>
-class queueTests : public ::testing::Test {
+class QueueTests : public ::testing::Test {
 protected:
     T queue;
 };
 
-TYPED_TEST_SUITE(queueTests, queueTypes);
+TYPED_TEST_SUITE(QueueTests, QueueTypes);
 
 // реярш
-TYPED_TEST(queueTests, DefaultConstructor) {
+TYPED_TEST(QueueTests, DefaultConstructor) {
     TypeParam q{};
     EXPECT_TRUE(q.empty());
     EXPECT_EQ(q.size(), 0);
 }
 
-TYPED_TEST(queueTests, ContainerCopyConstructor) {
+TYPED_TEST(QueueTests, ContainerCopyConstructor) {
     using Container = typename TypeParam::container_type;
     using ValueType = typename TypeParam::value_type;
 
@@ -60,7 +60,7 @@ TYPED_TEST(queueTests, ContainerCopyConstructor) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(2));
 }
 
-TYPED_TEST(queueTests, ContainerMoveConstructor) {
+TYPED_TEST(QueueTests, ContainerMoveConstructor) {
     using Container = typename TypeParam::container_type;
     using ValueType = typename TypeParam::value_type;
 
@@ -74,7 +74,7 @@ TYPED_TEST(queueTests, ContainerMoveConstructor) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(2));
 }
 
-TYPED_TEST(queueTests, IteratorConstructor) {
+TYPED_TEST(QueueTests, IteratorConstructor) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -89,7 +89,7 @@ TYPED_TEST(queueTests, IteratorConstructor) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(3));
 }
 
-TYPED_TEST(queueTests, AllocatorOnlyConstructor) {
+TYPED_TEST(QueueTests, AllocatorOnlyConstructor) {
     using ValueType = typename TypeParam::value_type;
     std::allocator<ValueType> alloc;
 
@@ -97,7 +97,7 @@ TYPED_TEST(queueTests, AllocatorOnlyConstructor) {
     EXPECT_TRUE(q.empty());
 }
 
-TYPED_TEST(queueTests, ContainerAndAllocatorCopyConstructor) {
+TYPED_TEST(QueueTests, ContainerAndAllocatorCopyConstructor) {
     using Container = typename TypeParam::container_type;
     using ValueType = typename TypeParam::value_type;
     std::allocator<ValueType> alloc;
@@ -112,7 +112,7 @@ TYPED_TEST(queueTests, ContainerAndAllocatorCopyConstructor) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(2));
 }
 
-TYPED_TEST(queueTests, ContainerAndAllocatorMoveConstructor) {
+TYPED_TEST(QueueTests, ContainerAndAllocatorMoveConstructor) {
     using Container = typename TypeParam::container_type;
     using ValueType = typename TypeParam::value_type;
     std::allocator<ValueType> alloc;
@@ -127,7 +127,7 @@ TYPED_TEST(queueTests, ContainerAndAllocatorMoveConstructor) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(2));
 }
 
-TYPED_TEST(queueTests, CopyConstructor) {
+TYPED_TEST(QueueTests, CopyConstructor) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -145,7 +145,7 @@ TYPED_TEST(queueTests, CopyConstructor) {
     EXPECT_EQ(q.size(), 3);
 }
 
-TYPED_TEST(queueTests, MoveConstructor) {
+TYPED_TEST(QueueTests, MoveConstructor) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -162,7 +162,7 @@ TYPED_TEST(queueTests, MoveConstructor) {
     EXPECT_EQ(move.back(), MakeValue<ValueType>(3));
 }
 
-TYPED_TEST(queueTests, Front) {
+TYPED_TEST(QueueTests, Front) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -182,7 +182,7 @@ TYPED_TEST(queueTests, Front) {
     EXPECT_EQ(cq.front(), MakeValue<ValueType>(13));
 }
 
-TYPED_TEST(queueTests, Back) {
+TYPED_TEST(QueueTests, Back) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -203,7 +203,7 @@ TYPED_TEST(queueTests, Back) {
 }
 
 
-TYPED_TEST(queueTests, PushLValue) {
+TYPED_TEST(QueueTests, PushLValue) {
     using ValueType = typename TypeParam::value_type;
 
     ValueType val = MakeValue<ValueType>(10);
@@ -215,7 +215,7 @@ TYPED_TEST(queueTests, PushLValue) {
     EXPECT_EQ(q.back(), val);
 }
 
-TYPED_TEST(queueTests, PushRValue) {
+TYPED_TEST(QueueTests, PushRValue) {
     using ValueType = typename TypeParam::value_type;
 
     TypeParam q{};
@@ -226,7 +226,7 @@ TYPED_TEST(queueTests, PushRValue) {
     EXPECT_EQ(q.back(), MakeValue<ValueType>(10));
 }
 
-TYPED_TEST(queueTests, Emplace) {
+TYPED_TEST(QueueTests, Emplace) {
     using ValueType = typename TypeParam::value_type;
 
     TypeParam q{};
@@ -244,7 +244,7 @@ TYPED_TEST(queueTests, Emplace) {
     }
 }
 
-TYPED_TEST(queueTests, Pop) {
+TYPED_TEST(QueueTests, Pop) {
     using ValueType = typename TypeParam::value_type;
 
     std::vector<ValueType> v = {
@@ -263,7 +263,7 @@ TYPED_TEST(queueTests, Pop) {
     EXPECT_TRUE(q.empty());
 }
 
-TYPED_TEST(queueTests, Swap) {
+TYPED_TEST(QueueTests, Swap) {
     using ValueType = typename TypeParam::value_type;
 
     TypeParam q1, q2;
@@ -281,7 +281,7 @@ TYPED_TEST(queueTests, Swap) {
     EXPECT_EQ(q2.front(), MakeValue<ValueType>(1));
 }
 
-TYPED_TEST(queueTests, Comparisons) {
+TYPED_TEST(QueueTests, Comparisons) {
     using ValueType = typename TypeParam::value_type;
 
     TypeParam q1, q2, q3, q4;
