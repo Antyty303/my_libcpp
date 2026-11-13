@@ -1,3 +1,4 @@
+#pragma once
 #include "my/vector.h"
 #include <algorithm>
 #include <utility>
@@ -88,41 +89,30 @@ namespace my {
         void push(const value_type& value) { c.push_back(value); }
         void push(value_type&& value) { c.push_back(std::move(value)); }
         template<class... Args>
-        decltype(auto) emplace(Args&&... args) { return c.emplace_back(std::forward<Args>(args)...); }
+        reference emplace(Args&&... args) { return c.emplace_back(std::forward<Args>(args)...); }
         void pop() { c.pop_back(); }
 
         void swap(stack& other) noexcept(noexcept(std::swap(c, other.c))) { std::swap(c, other.c); }
+
+        friend inline bool operator==(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c == rhs.c;
+        }
+        friend inline bool operator!=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c != rhs.c;
+        }
+        friend inline bool operator<(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c < rhs.c;
+        }
+        friend inline bool operator<=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c <= rhs.c;
+        }
+        friend inline bool operator>(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c > rhs.c;
+        }
+        friend inline bool operator>=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
+            return lhs.c >= rhs.c;
+        }
     };
-
-    template<typename T, typename Container>
-    bool operator==(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
-
-    template<typename T, typename Container>
-    bool operator!=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
-
-    template<typename T, typename Container>
-    bool operator<(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
-
-    template<typename T, typename Container>
-    bool operator<=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
-
-    template<typename T, typename Container>
-    bool operator>(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
-
-    template<typename T, typename Container>
-    bool operator>=(const stack<T, Container>& lhs, const stack<T, Container>& rhs) {
-        return lhs.c == rhs.c;
-    }
 
     template<typename T, typename Container>
     void swap(stack<T, Container>& lhs, stack<T, Container>& rhs) noexcept(noexcept(lhs.swap(rhs))) {
