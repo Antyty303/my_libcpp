@@ -13,8 +13,6 @@
 #define IF_CONFIGURATION_IS_DEBUG(code) 
 #endif
 
-//��������� ��������� ��� ���������� ���������� ��� ���� ������ ���������� ����������� �� �����
-
 namespace my {
 #pragma region Class
 	template<typename T, typename Alloc = ::std::allocator<T>>
@@ -1558,7 +1556,9 @@ namespace my {
 		IF_CONFIGURATION_IS_DEBUG(invalidate_all_iterators();)
 		return *this;
 	}
+#pragma endregion
 
+#pragma region comparison
 	template <typename T, typename Alloc>
 	inline bool vector<T, Alloc>::operator!=(const vector<T, Alloc>& other) const {
 		if (size_ == other.size_) {
@@ -1617,6 +1617,36 @@ namespace my {
 			else if (data_[i] < other.data_[i]) return false;
 		}
 		return size_ > other.size_;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator==(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs == rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator!=(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs != rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator<(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs < rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator<=(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs <= rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator>(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs > rhs;
+	}
+
+	template<typename T, typename Alloc>
+	bool operator>=(const vector<T, Alloc>& lhs, const vector<T, Alloc>& rhs) {
+		return lhs >= rhs;
 	}
 #pragma endregion
 
@@ -1790,6 +1820,11 @@ namespace my {
 		std::swap(capacity_, other.capacity_);
 		std::swap(data_, other.data_);
 		if constexpr (Traits::propagate_on_container_swap::value) std::swap(alloc_, other.alloc_);
+	}
+
+	template<typename T, typename Alloc>
+	constexpr void swap(vector<T, Alloc>& lhs, vector<T, Alloc>& rhs) {
+		lhs.swap(rhs);
 	}
 #pragma endregion
 
