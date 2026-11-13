@@ -38,7 +38,7 @@ namespace my {
 		using map_pointer = typename std::allocator_traits<map_alloc>::pointer;
 		using map_Traits = std::allocator_traits<map_alloc>;
 
-		map_pointer map_ = nullptr; //T**
+		map_pointer map_ = nullptr; //T**  //Надо написать отдельно класс циклический буффер, его использовать в качестве мап
 		size_type map_size_ = 0;
 		map_alloc map_alloc_;
 
@@ -192,7 +192,7 @@ namespace my {
 		template<typename... Args>
 		reference emplace_front(Args&&... args);
 		void pop_front();
-		//
+		
 		iterator insert(const_iterator pos, const T& val);
 		iterator insert(const_iterator pos, T&& val);
 		iterator insert(const_iterator pos, size_type count, const T& val);
@@ -209,7 +209,7 @@ namespace my {
 
 		iterator erase(const_iterator pos);
 		iterator erase(const_iterator first, const_iterator last);
-		//
+		
 		bool operator==(const deque& other) const;
 		bool operator!=(const deque& other) const;
 		bool operator<=(const deque& other) const;
@@ -1259,7 +1259,51 @@ namespace my {
 #pragma endregion
 
 #pragma region middle
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, const T& val) {
+		 
+	}
+	
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, T&& val) {
 
+	}
+	
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, size_type count, const T& val) {
+
+	}
+	
+	template<typename T, typename Alloc>
+	template<class It>
+	requires std::forward_iterator<It>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, It first, It last) {
+
+	}
+	
+	template<typename T, typename Alloc>
+	template<class It>
+	requires std::input_iterator<It> && (!std::forward_iterator<It>)
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, It first, It last) {
+
+	}
+
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::insert(const_iterator pos, std::initializer_list<T> list) {
+		return insert(pos, list.begin(), list.end());
+	}
+
+	template<typename T, typename Alloc>
+	template<typename... Args>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::emplace(const_iterator pos, Args&&... args) {
+
+	}
+
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::erase(const_iterator pos);
+
+	template<typename T, typename Alloc>
+	inline deque<T, Alloc>::iterator deque<T, Alloc>::erase(const_iterator first, const_iterator last);
 #pragma endregion
 
 }
