@@ -7,7 +7,7 @@ on:
     branches: [ "main", "master" ]
 
 jobs:
-  changes:
+  search-for-changes:
     runs-on: ubuntu-latest
     
     outputs:
@@ -46,7 +46,7 @@ jobs:
             - 'include/my/deque.h'
 
   build-and-test:
-    needs: changes
+    needs: search-for-changes
     runs-on: ubuntu-latest
 
     strategy:
